@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SplitWise - Group Expense Sharing</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        /* Header */
+        .header {
+            background: #6200ea;
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 16px;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: background 0.3s;
+            font-size: 18px;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        /* Overall Balance */
+        .overall-balance {
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .balance-text {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .balance-amount {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .amount-owe {
+            color: #e53e3e;
+        }
+
+        .amount-get {
+            color: #38a169;
+        }
+
+        /* Groups List */
+        .groups-container {
+            flex: 1;
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+
+        .group-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #6200ea;
+            cursor: pointer;
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .group-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .group-icon {
+            width: 40px;
+            height: 40px;
+            background: #6200ea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+        }
+
+        .group-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .group-amount {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .group-details {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Create Group Button */
+        .create-group-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 50%;
+            transform: translateX(50%);
+            background: #6200ea;
+            color: white;
+            border: none;
+            border-radius: 28px;
+            width: 56px;
+            height: 56px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(98, 0, 234, 0.4);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .create-group-btn:hover {
+            transform: translateX(50%) scale(1.1);
+            box-shadow: 0 6px 20px rgba(98, 0, 234, 0.6);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 360px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #6200ea;
+        }
+
+        .type-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .type-option {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .type-option:hover, .type-option.selected {
+            border-color: #6200ea;
+            background: rgba(98, 0, 234, 0.1);
+        }
+
+        .type-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .type-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #6200ea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a00d6;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #6200ea;
+            border: 2px solid #6200ea;
+        }
+
+        .btn-secondary:hover {
+            background: #6200ea;
+            color: white;
+        }
+
+        .btn-add {
+            background: #38a169;
+            color: white;
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        /* Group Page Styles */
+        .group-header-section {
+            background: linear-gradient(135deg, #6200ea, #9c27b0);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .group-type-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .participants-count {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .empty-group {
+            background: #f5f5f5;
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            margin: 20px;
+        }
+
+        .empty-group h3 {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            border-bottom-color: #6200ea;
+            background: white;
+            color: #6200ea;
+            font-weight: 600;
+        }
+
+        .tab-content {
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .toggle-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: #ccc;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #6200ea;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(26px);
+        }
+
+        .member-list {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .member-item:last-child {
+            border-bottom: none;
+        }
+
+        .member-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #6200ea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+
+        .expense-item {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .expense-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .expense-description {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .expense-amount {
+            font-weight: bold;
+            color: #6200ea;
+        }
+
+        .expense-details {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .summary-row:last-child {
+            margin-bottom: 0;
+            font-weight: bold;
+            font-size: 18px;
+            border-top: 1px solid #e9ecef;
+            padding-top: 12px;
+        }
+
+        .member-input-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .member-input {
+            flex: 1;
+            border: none;
+            background: none;
+            padding: 8px;
+            font-size: 16px;
+        }
+
+        .member-input:focus {
+            outline: none;
+        }
+
+        .remove-member-btn {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .expense-form-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .expense-form-icon {
+            width: 40px;
+            height: 40px;
+            background: #6200ea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+        }
+
+        .clickable-row {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .clickable-row:hover {
+            background: #e9ecef;
+        }
+
+        .row-label {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .row-value {
+            color: #666;
+        }
+
+        .arrow-right {
+            margin-left: 8px;
+            color: #999;
+        }
+
+        .split-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .split-option:hover, .split-option.selected {
+            background: rgba(98, 0, 234, 0.1);
+            border: 2px solid #6200ea;
+        }
+
+        .split-icon {
+            width: 40px;
+            height: 40px;
+            background: #6200ea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+        }
+
+        .user-selection {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .user-checkbox {
+            margin-right: 8px;
+        }
+
+        .amount-input {
+            width: 80px;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-left: auto;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                max-width: 100%;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 20px;
+            }
+        }
+
+        /* Hide scrollbar but keep functionality */
+        .modal-content::-webkit-scrollbar {
+            display: none;
+        }
+        .modal-content {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="mainContainer">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                💰 SplitWise
+            </div>
+            <div class="header-icons">
+                <button class="icon-btn" onclick="searchGroups()">
+                    🔍
+                </button>
+                <button class="icon-btn" onclick="showCreateGroupModal()">
+                    👥➕
+                </button>
+            </div>
+        </div>
+
+        <!-- Overall Balance -->
+        <div class="overall-balance">
+            <div class="balance-text">Overall, you</div>
+            <div class="balance-amount" id="overallBalance">
+                <span class="amount-get">get ₹0</span>
+            </div>
+        </div>
+
+        <!-- Groups Container -->
+        <div class="groups-container" id="groupsContainer">
+            <div class="empty-state">
+                <div class="empty-icon">👥</div>
+                <h3>No groups yet</h3>
+                <p>Create your first group to start splitting expenses with friends!</p>
+            </div>
+        </div>
+
+        <!-- Create Group Button -->
+        <button class="create-group-btn" onclick="showCreateGroupModal()">
+            ➕
+        </button>
+    </div>
+
+    <!-- Create Group Modal -->
+    <div class="modal" id="createGroupModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="hideCreateGroupModal()">&times;</button>
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Group</h2>
+            </div>
+            <form id="createGroupForm">
+                <div class="form-group">
+                    <label class="form-label">Group Name</label>
+                    <input type="text" class="form-input" id="groupName" placeholder="Enter group name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Select Type</label>
+                    <div class="type-options">
+                        <div class="type-option" data-type="trip">
+                            <div class="type-icon">✈️</div>
+                            <div class="type-label">Trip</div>
+                        </div>
+                        <div class="type-option" data-type="home">
+                            <div class="type-icon">🏠</div>
+                            <div class="type-label">Home</div>
+                        </div>
+                        <div class="type-option" data-type="couple">
+                            <div class="type-icon">💑</div>
+                            <div class="type-label">Couple</div>
+                        </div>
+                        <div class="type-option" data-type="other">
+                            <div class="type-icon">📝</div>
+                            <div class="type-label">Other</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Done</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Members Modal -->
+    <div class="modal" id="addMembersModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="hideAddMembersModal()">&times;</button>
+            <div class="modal-header">
+                <h2 class="modal-title">Add Members</h2>
+            </div>
+            <div id="membersInputContainer">
+                <div class="member-input-group">
+                    <span style="margin-right: 8px;">👤</span>
+                    <input type="text" class="member-input" placeholder="Enter member name">
+                    <button type="button" class="btn-add" onclick="addMemberInput()">+</button>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveMembersToGroup()" style="margin-top: 20px;">Done</button>
+        </div>
+    </div>
+
+    <!-- Add Expense Modal -->
+    <div class="modal" id="addExpenseModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="hideAddExpenseModal()">&times;</button>
+            <div class="modal-header">
+                <h2 class="modal-title">Add Expense</h2>
+            </div>
+            <div id="expenseFormContainer">
+                <div class="expense-form-row">
+                    <div class="expense-form-icon">🏷️</div>
+                    <input type="text" class="form-input" id="expenseDescription" placeholder="Expense description" required>
+                </div>
+                
+                <div class="expense-form-row">
+                    <div class="expense-form-icon">₹</div>
+                    <input type="number" class="form-input" id="expenseAmount" placeholder="Amount" required>
+                </div>
+
+                <div class="clickable-row" onclick="showPaidByModal()">
+                    <span class="row-label">Paid by</span>
+                    <span class="row-value" id="paidByValue">You</span>
+                    <span class="arrow-right">→</span>
+                </div>
+
+                <div class="clickable-row" onclick="showSplitModal()">
+                    <span class="row-label">Split</span>
+                    <span class="row-value" id="splitValue">Equally</span>
+                    <span class="arrow-right">→</span>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveExpense()">Add Expense</button>
+        </div>
+    </div>
+
+    <!-- Paid By Modal -->
+    <div class="modal" id="paidByModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="hidePaidByModal()">&times;</button>
+            <div class="modal-header">
+                <h2 class="modal-title">Who paid?</h2>
+            </div>
+            <div id="paidByContainer"></div>
+            <button class="btn btn-primary" onclick="savePaidBy()">Done</button>
+        </div>
+    </div>
+
+    <!-- Split Modal -->
+    <div class="modal" id="splitModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="hideSplitModal()">&times;</button>
+            <div class="modal-header">
+                <h2 class="modal-title">How to split?</h2>
+            </div>
+            <div class="split-option" data-split="equally">
+                <div class="split-icon">⚖️</div>
+                <div>
+                    <div style="font-weight: 600;">Split Equally</div>
+                    <div style="font-size: 14px; color: #666;">Everyone pays the same amount</div>
+                </div>
+            </div>
+            <div class="split-option" data-split="exact">
+                <div class="split-icon">🔢</div>
+                <div>
+                    <div style="font-weight: 600;">Split Exact Amounts</div>
+                    <div style="font-size: 14px; color: #666;">Specify exact amounts for each person</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Split Details Modal -->
+    <div class="modal" id="splitDetailsModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="hideSplitDetailsModal()">&times;</button>
+            <div class="modal-header">
+                <h2 class="modal-title" id="splitDetailsTitle">Split Details</h2>
+            </div>
+            <div id="splitDetailsContainer"></div>
+            <button class="btn btn-primary" onclick="saveSplitDetails()">Done</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = 'You';
+        let selectedGroupType = null;
+        let currentGroupId = null;
+        let currentExpense = {};
+        let simplifyDebt = true;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            loadGroups();
+            setupEventListeners();
+        }
+
+        function setupEventListeners() {
+            // Type selection
+            document.querySelectorAll('.type-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedGroupType = this.dataset.type;
+                });
+            });
+
+            // Form submission
+            document.getElementById('createGroupForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                createGroup();
+            });
+
+            // Split options
+            document.querySelectorAll('.split-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.split-option').forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+                    currentExpense.splitType = this.dataset.split;
+                    
+                    if (this.dataset.split === 'exact') {
+                        showSplitDetailsModal();
+                    } else {
+                        hideSplitModal();
+                        document.getElementById('splitValue').textContent = 'Equally';
+                    }
+                });
+            });
+        }
+
+        function showCreateGroupModal() {
+            document.getElementById('createGroupModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideCreateGroupModal() {
+            document.getElementById('createGroupModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+            resetCreateGroupForm();
+        }
+
+        function resetCreateGroupForm() {
+            document.getElementById('createGroupForm').reset();
+            document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('selected'));
+            selectedGroupType = null;
+        }
+
+        function createGroup() {
+            const groupName = document.getElementById('groupName').value.trim();
+            
+            if (!groupName || !selectedGroupType) {
+                alert('Please fill all data in form');
+                return;
+            }
+
+            const groupId = 'group_' + Date.now();
+            const newGroup = {
+                id: groupId,
+                name: groupName,
+                type: selectedGroupType,
+                members: [currentUser],
+                expenses: [],
+                balances: {},
+                createdAt: new Date().toISOString()
+            };
+
+            // Save to localStorage
+            let groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            groups.push(newGroup);
+            localStorage.setItem('splitwise_groups', JSON.stringify(groups));
+
+            hideCreateGroupModal();
+            loadGroups();
+            
+            // Navigate to group page
+            openGroupPage(groupId);
+        }
+
+        function loadGroups() {
+            const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const container = document.getElementById('groupsContainer');
+            
+            if (groups.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">👥</div>
+                        <h3>No groups yet</h3>
+                        <p>Create your first group to start splitting expenses with friends!</p>
+                    </div>
+                `;
+                updateOverallBalance(0);
+                return;
+            }
+
+            let totalBalance = 0;
+            let groupsHTML = '';
+
+            groups.forEach(group => {
+                const groupBalance = calculateUserBalance(group, currentUser);
+                totalBalance += groupBalance;
+                
+                const typeIcons = {
+                    trip: '✈️',
+                    home: '🏠',
+                    couple: '💑',
+                    other: '📝'
+                };
+
+                const balanceClass = groupBalance >= 0 ? 'amount-get' : 'amount-owe';
+                const balanceText = groupBalance >= 0 ? 'get' : 'owe';
+                const balanceAmount = Math.abs(groupBalance);
+
+                groupsHTML += `
+                    <div class="group-card" onclick="openGroupPage('${group.id}')">
+                        <div class="group-header">
+                            <div class="group-info">
+                                <div class="group-icon">
+                                    ${typeIcons[group.type]}
+                                </div>
+                                <div class="group-name">${group.name}</div>
+                            </div>
+                            <div class="group-amount ${balanceClass}">
+                                ${balanceText} ₹${balanceAmount}
+                            </div>
+                        </div>
+                        <div class="group-details">
+                            ${group.members.length} members • ${group.expenses.length} expenses
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = groupsHTML;
+            updateOverallBalance(totalBalance);
+        }
+
+        function calculateUserBalance(group, user) {
+            if (!group.balances || !group.balances[user]) return 0;
+            let balance = 0;
+            Object.entries(group.balances[user]).forEach(([otherUser, amount]) => {
+                balance += amount;
+            });
+            return balance;
+        }
+
+        function updateOverallBalance(amount) {
+            const balanceElement = document.getElementById('overallBalance');
+            const absAmount = Math.abs(amount);
+            
+            if (amount >= 0) {
+                balanceElement.innerHTML = `<span class="amount-get">get ₹${absAmount}</span>`;
+            } else {
+                balanceElement.innerHTML = `<span class="amount-owe">owe ₹${absAmount}</span>`;
+            }
+        }
+
+        function openGroupPage(groupId) {
+            currentGroupId = groupId;
+            localStorage.setItem('current_group_id', groupId);
+            createGroupPage(groupId);
+        }
+
+        function createGroupPage(groupId) {
+            const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const group = groups.find(g => g.id === groupId);
+            
+            if (!group) {
+                alert('Group not found');
+                return;
+            }
+
+            const typeIcons = {
+                trip: '✈️',
+                home: '🏠',
+                couple: '💑',
+                other: '📝'
+            };
+
+            let groupPageHTML = `
+                <div class="container">
+                    <!-- Group Header -->
+                    <div class="header">
+                        <button class="icon-btn" onclick="goBack()">←</button>
+                        <div class="logo">${group.name}</div>
+                        <button class="icon-btn" onclick="shareGroup('${groupId}')">📤</button>
+                    </div>
+
+                    <!-- Group Icon Section -->
+                    <div class="group-header-section">
+                        <div class="group-type-icon">${typeIcons[group.type]}</div>
+                        <div class="participants-count">${group.members.length} participants</div>
+                    </div>
+            `;
+
+            if (group.members.length === 1) {
+                groupPageHTML += `
+                    <div class="empty-group">
+                        <h3>You're the only one here!</h3>
+                        <button class="btn btn-primary" style="margin-bottom: 12px;" onclick="showAddMembersModal()">Add Members</button>
+                        <button class="btn btn-secondary" onclick="shareLink('${groupId}')">Share a link</button>
+                    </div>
+                `;
+            } else {
+                groupPageHTML += `
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <div class="tab active" onclick="switchTab('expenses')">Expenses</div>
+                        <div class="tab" onclick="switchTab('participants')">Participants</div>
+                        <div class="tab" onclick="switchTab('balances')">Balances</div>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content">
+                        <div id="expensesTab">
+                            <!-- Toggle for Simplify Debt -->
+                            <div class="toggle-container">
+                                <span class="toggle-label">Simplify debts</span>
+                                <div class="toggle-switch ${simplifyDebt ? 'active' : ''}" onclick="toggleSimplifyDebt()"></div>
+                            </div>
+
+                            <!-- Summary Card -->
+                            <div class="summary-card">
+                                <div class="summary-row">
+                                    <span>Total group spending</span>
+                                    <span>₹${calculateTotalSpending(group)}</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span>Your share</span>
+                                    <span>₹${calculateUserShare(group, currentUser)}</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span>You ${calculateUserBalance(group, currentUser) >= 0 ? 'get' : 'owe'}</span>
+                                    <span class="${calculateUserBalance(group, currentUser) >= 0 ? 'amount-get' : 'amount-owe'}">₹${Math.abs(calculateUserBalance(group, currentUser))}</span>
+                                </div>
+                            </div>
+
+                            <!-- Expenses List -->
+                            <div id="expensesList">
+                                ${renderExpensesList(group)}
+                            </div>
+
+                            <!-- Add Expense Button -->
+                            <button class="btn btn-primary" onclick="showAddExpenseModal()" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 360px;">Add Expense</button>
+                        </div>
+
+                        <div id="participantsTab" style="display: none;">
+                            <div class="member-list">
+                                ${renderMembersList(group)}
+                            </div>
+                            <button class="btn btn-secondary" onclick="showAddMembersModal()" style="margin-top: 20px;">Add More Members</button>
+                        </div>
+
+                        <div id="balancesTab" style="display: none;">
+                            <div class="member-list">
+                                ${renderBalances(group)}
+                            </div>
+                    </div>
+                `;
+            }
+
+            groupPageHTML += `</div>`;
+            document.getElementById('mainContainer').innerHTML = groupPageHTML;
+        }
+
+        function renderExpensesList(group) {
+            if (group.expenses.length === 0) {
+                return '<div class="empty-state"><div class="empty-icon">💸</div><h3>No expenses yet</h3><p>Add your first expense to get started!</p></div>';
+            }
+
+            return group.expenses.map(expense => `
+                <div class="expense-item">
+                    <div class="expense-header">
+                        <div class="expense-description">${expense.description}</div>
+                        <div class="expense-amount">₹${expense.amount}</div>
+                        <button class="icon-btn" style="color:#e53e3e;font-size:18px;" onclick="deleteExpense('${group.id}','${expense.id}')">🗑️</button>
+                    </div>
+                    <div class="expense-details">
+                        Paid by ${expense.paidBy} • Split ${expense.splitType === 'equally' ? 'equally' : 'by exact amounts'}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderMembersList(group) {
+            return group.members.map(member => {
+                const initial = member.charAt(0).toUpperCase();
+                const balance = calculateUserBalance(group, member);
+                const balanceText = balance === 0 ? 'settled up' : `${balance > 0 ? 'gets' : 'owes'} ₹${Math.abs(balance)}`;
+                const balanceClass = balance > 0 ? 'amount-get' : balance < 0 ? 'amount-owe' : '';
+                
+                return `
+                    <div class="member-item">
+                        <div class="member-avatar">${initial}</div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600;">${member}</div>
+                            <div style="font-size: 14px; color: #666;" class="${balanceClass}">${balanceText}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderBalances(group) {
+            if (!group.balances) return '<div style="text-align:center;color:#666;">No balances yet</div>';
+            let balancesHTML = '';
+            const balances = simplifyDebt ? simplifyDebts(group.balances) : group.balances;
+
+            Object.entries(balances).forEach(([debtor, creditors]) => {
+                if (typeof creditors === 'object') {
+                    Object.entries(creditors).forEach(([creditor, amount]) => {
+                        if (amount > 0.009) { // Only show non-zero balances
+                            balancesHTML += `
+                                <div class="expense-item">
+                                    <div class="expense-details">
+                                        <strong>${debtor}</strong> owes <strong>${creditor}</strong> <span class="amount-owe">₹${amount.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                }
+            });
+
+            if (!balancesHTML) {
+                balancesHTML = '<div style="text-align:center;color:#666;">All settled up!</div>';
+            }
+            return balancesHTML;
+        }
+
+        function calculateTotalSpending(group) {
+            return group.expenses.reduce((total, expense) => total + expense.amount, 0);
+        }
+
+        function calculateUserShare(group, user) {
+            let userShare = 0;
+            group.expenses.forEach(expense => {
+                if (expense.splitDetails && expense.splitDetails[user]) {
+                    userShare += expense.splitDetails[user];
+                }
+            });
+            return userShare;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('expensesTab').style.display = tabName === 'expenses' ? 'block' : 'none';
+            document.getElementById('participantsTab').style.display = tabName === 'participants' ? 'block' : 'none';
+            document.getElementById('balancesTab').style.display = tabName === 'balances' ? 'block' : 'none';
+        }
+
+        function toggleSimplifyDebt() {
+            simplifyDebt = !simplifyDebt;
+            document.querySelector('.toggle-switch').classList.toggle('active');
+            createGroupPage(currentGroupId); // Refresh the view
+        }
+
+        function simplifyDebts(balances) {
+            // Implementation of debt simplification algorithm
+            const simplified = {};
+            
+            // Calculate net balances
+            const netBalances = {};
+            Object.keys(balances).forEach(person => {
+                netBalances[person] = 0;
+                if (balances[person]) {
+                    Object.entries(balances[person]).forEach(([other, amount]) => {
+                        netBalances[person] += amount;
+                        if (!netBalances[other]) netBalances[other] = 0;
+                        netBalances[other] -= amount;
+                    });
+                }
+            });
+
+            // Create simplified transactions
+            const creditors = [];
+            const debtors = [];
+            
+            Object.entries(netBalances).forEach(([person, balance]) => {
+                if (balance > 0) {
+                    debtors.push({ person, amount: balance });
+                } else if (balance < 0) {
+                    creditors.push({ person, amount: -balance });
+                }
+            });
+
+            // Generate simplified transactions
+            let i = 0, j = 0;
+            while (i < debtors.length && j < creditors.length) {
+                const debtor = debtors[i];
+                const creditor = creditors[j];
+                const amount = Math.min(debtor.amount, creditor.amount);
+                
+                if (!simplified[debtor.person]) simplified[debtor.person] = {};
+                simplified[debtor.person][creditor.person] = amount;
+                
+                debtor.amount -= amount;
+                creditor.amount -= amount;
+                
+                if (debtor.amount === 0) i++;
+                if (creditor.amount === 0) j++;
+            }
+
+            return simplified;
+        }
+
+        function showAddMembersModal() {
+            document.getElementById('addMembersModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideAddMembersModal() {
+            document.getElementById('addMembersModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+            // Reset members input
+            document.getElementById('membersInputContainer').innerHTML = `
+                <div class="member-input-group">
+                    <span style="margin-right: 8px;">👤</span>
+                    <input type="text" class="member-input" placeholder="Enter member name">
+                    <button type="button" class="btn-add" onclick="addMemberInput()">+</button>
+                </div>
+            `;
+        }
+
+        function addMemberInput() {
+            const container = document.getElementById('membersInputContainer');
+            const newInput = document.createElement('div');
+            newInput.className = 'member-input-group';
+            newInput.innerHTML = `
+                <span style="margin-right: 8px;">👤</span>
+                <input type="text" class="member-input" placeholder="Enter member name">
+                <button type="button" class="btn-add" onclick="addMemberInput()">+</button>
+                <button type="button" class="remove-member-btn" onclick="removeMemberInput(this)">×</button>
+            `;
+            container.appendChild(newInput);
+        }
+
+        function removeMemberInput(button) {
+            button.parentElement.remove();
+        }
+
+        function saveMembersToGroup() {
+            const memberInputs = document.querySelectorAll('.member-input');
+            const newMembers = [];
+            
+            memberInputs.forEach(input => {
+                const memberName = input.value.trim();
+                if (memberName && !newMembers.includes(memberName)) {
+                    newMembers.push(memberName);
+                }
+            });
+
+            if (newMembers.length === 0) {
+                alert('Please enter at least one member name');
+                return;
+            }
+
+            // Update group with new members
+            const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const groupIndex = groups.findIndex(g => g.id === currentGroupId);
+            
+            if (groupIndex !== -1) {
+                newMembers.forEach(member => {
+                    if (!groups[groupIndex].members.includes(member)) {
+                        groups[groupIndex].members.push(member);
+                    }
+                });
+                
+                localStorage.setItem('splitwise_groups', JSON.stringify(groups));
+                hideAddMembersModal();
+                createGroupPage(currentGroupId);
+            }
+        }
+
+        function showAddExpenseModal() {
+            // Reset expense form
+            currentExpense = {
+                paidBy: [currentUser],
+                splitType: 'equally',
+                participants: []
+            };
+            
+            document.getElementById('expenseDescription').value = '';
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('paidByValue').textContent = 'You';
+            document.getElementById('splitValue').textContent = 'Equally';
+            
+            document.getElementById('addExpenseModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideAddExpenseModal() {
+            document.getElementById('addExpenseModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function showPaidByModal() {
+            const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const group = groups.find(g => g.id === currentGroupId);
+            
+            let paidByHTML = '';
+            group.members.forEach(member => {
+                const isSelected = currentExpense.paidBy.includes(member);
+                paidByHTML += `
+                    <div class="user-selection">
+                        <input type="checkbox" class="user-checkbox" ${isSelected ? 'checked' : ''} 
+                               onchange="updatePaidBy('${member}', this.checked)">
+                        <span>${member}</span>
+                        ${currentExpense.paidBy.length > 1 ? 
+                            `<input type="number" class="amount-input" placeholder="Amount" 
+                                    value="${currentExpense.paidByAmounts ? currentExpense.paidByAmounts[member] || '' : ''}"
+                                    onchange="updatePaidByAmount('${member}', this.value)">` : ''}
+                    </div>
+                `;
+            });
+            
+            document.getElementById('paidByContainer').innerHTML = paidByHTML;
+            document.getElementById('paidByModal').style.display = 'block';
+        }
+
+        function hidePaidByModal() {
+            document.getElementById('paidByModal').style.display = 'none';
+        }
+
+        function updatePaidBy(member, isChecked) {
+            if (isChecked) {
+                if (!currentExpense.paidBy.includes(member)) {
+                    currentExpense.paidBy.push(member);
+                }
+            } else {
+                currentExpense.paidBy = currentExpense.paidBy.filter(m => m !== member);
+            }
+            
+            if (currentExpense.paidBy.length === 0) {
+                currentExpense.paidBy = [currentUser]; // Always have at least one person
+            }
+            
+            showPaidByModal(); // Refresh the modal
+        }
+
+        function updatePaidByAmount(member, amount) {
+            if (!currentExpense.paidByAmounts) {
+                currentExpense.paidByAmounts = {};
+            }
+            currentExpense.paidByAmounts[member] = parseFloat(amount) || 0;
+        }
+
+        function savePaidBy() {
+            const paidByText = currentExpense.paidBy.length === 1 ? 
+                currentExpense.paidBy[0] : 
+                `${currentExpense.paidBy.length} people`;
+            document.getElementById('paidByValue').textContent = paidByText;
+            hidePaidByModal();
+        }
+
+        function showSplitModal() {
+            document.getElementById('splitModal').style.display = 'block';
+        }
+
+        function hideSplitModal() {
+            document.getElementById('splitModal').style.display = 'none';
+        }
+
+        function showSplitDetailsModal() {
+            const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const group = groups.find(g => g.id === currentGroupId);
+            const totalAmount = parseFloat(document.getElementById('expenseAmount').value) || 0;
+            
+            document.getElementById('splitDetailsTitle').textContent = 
+                currentExpense.splitType === 'equally' ? 'Split Equally' : 'Split Exact Amounts';
+                
+            let splitHTML = '';
+            
+            if (currentExpense.splitType === 'equally') {
+                const amountPerPerson = totalAmount / group.members.length;
+                group.members.forEach(member => {
+                    splitHTML += `
+                        <div class="user-selection">
+                            <input type="checkbox" class="user-checkbox" checked
+                                   onchange="updateSplitParticipation('${member}', this.checked)">
+                            <span>${member}</span>
+                            <span style="margin-left: auto;">₹${amountPerPerson.toFixed(2)}</span>
+                        </div>
+                    `;
+                });
+            } else {
+                group.members.forEach(member => {
+                    const currentAmount = currentExpense.splitDetails ? currentExpense.splitDetails[member] || 0 : 0;
+                    splitHTML += `
+                        <div class="user-selection">
+                            <input type="checkbox" class="user-checkbox" ${currentAmount > 0 ? 'checked' : ''}
+                                   onchange="updateSplitParticipation('${member}', this.checked)">
+                            <span>${member}</span>
+                            <input type="number" class="amount-input" placeholder="Amount" 
+                                   value="${currentAmount || ''}"
+                                   onchange="updateSplitAmount('${member}', this.value)">
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById('splitDetailsContainer').innerHTML = splitHTML;
+            document.getElementById('splitDetailsModal').style.display = 'block';
+        }
+
+        function hideSplitDetailsModal() {
+            document.getElementById('splitDetailsModal').style.display = 'none';
+        }
+
+        function updateSplitParticipation(member, isParticipating) {
+            if (!currentExpense.participants) {
+                currentExpense.participants = [];
+            }
+            
+            if (isParticipating) {
+                if (!currentExpense.participants.includes(member)) {
+                    currentExpense.participants.push(member);
+                }
+            } else {
+                currentExpense.participants = currentExpense.participants.filter(m => m !== member);
+            }
+        }
+
+        function updateSplitAmount(member, amount) {
+            if (!currentExpense.splitDetails) {
+                currentExpense.splitDetails = {};
+            }
+            currentExpense.splitDetails[member] = parseFloat(amount) || 0;
+        }
+
+        function saveSplitDetails() {
+            hideSplitDetailsModal();
+            hideSplitModal();
+            document.getElementById('splitValue').textContent = 
+                currentExpense.splitType === 'equally' ? 'Equally' : 'Exact amounts';
+        }
+
+        function saveExpense() {
+            const description = document.getElementById('expenseDescription').value.trim();
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            
+            if (!description || !amount) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            // Get current group
+            const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const groupIndex = groups.findIndex(g => g.id === currentGroupId);
+            
+            if (groupIndex === -1) {
+                alert('Group not found');
+                return;
+            }
+            
+            const group = groups[groupIndex];
+            
+            // Create expense object
+            const expense = {
+                id: 'expense_' + Date.now(),
+                description: description,
+                amount: amount,
+                paidBy: currentExpense.paidBy.length === 1 ? currentExpense.paidBy[0] : 'Multiple people',
+                paidByDetails: currentExpense.paidBy,
+                paidByAmounts: currentExpense.paidByAmounts,
+                splitType: currentExpense.splitType || 'equally',
+                participants: currentExpense.participants || group.members,
+                splitDetails: currentExpense.splitDetails || {},
+                createdAt: new Date().toISOString()
+            };
+            
+            // Calculate split amounts if equally
+            if (expense.splitType === 'equally') {
+                const participantCount = expense.participants.length > 0 ? expense.participants.length : group.members.length;
+                const amountPerPerson = amount / participantCount;
+                expense.splitDetails = {};
+                (expense.participants.length > 0 ? expense.participants : group.members).forEach(member => {
+                    expense.splitDetails[member] = amountPerPerson;
+                });
+            }
+            
+            // Add expense to group
+            groups[groupIndex].expenses.push(expense);
+            
+            // Update balances
+            updateGroupBalances(groups[groupIndex]);
+            
+            // Save to localStorage
+            localStorage.setItem('splitwise_groups', JSON.stringify(groups));
+            
+            // Close modal and refresh view
+            hideAddExpenseModal();
+            createGroupPage(currentGroupId);
+        }
+
+        function updateGroupBalances(group) {
+            // Reset balances: balances[debtor][creditor] = amount
+            group.balances = {};
+            group.members.forEach(member => {
+                group.balances[member] = {};
+                group.members.forEach(other => {
+                    if (member !== other) {
+                        group.balances[member][other] = 0;
+                    }
+                });
+            });
+
+            // For each expense, update balances
+            group.expenses.forEach(expense => {
+                const paidByDetails = expense.paidByDetails || [expense.paidBy];
+                const splitDetails = expense.splitDetails || {};
+                let paidAmounts = {};
+                let totalPaid = 0;
+
+                // Calculate paid amounts
+                if (expense.paidByAmounts && paidByDetails.length > 1) {
+                    paidByDetails.forEach(payer => {
+                        paidAmounts[payer] = expense.paidByAmounts[payer] || 0;
+                        totalPaid += paidAmounts[payer];
+                    });
+                } else {
+                    paidAmounts[paidByDetails[0]] = expense.amount;
+                    totalPaid = expense.amount;
+                }
+
+                // For each participant, calculate how much they owe to each payer
+                Object.entries(splitDetails).forEach(([participant, owedAmount]) => {
+                    paidByDetails.forEach(payer => {
+                        if (participant !== payer) {
+                            // If multiple payers, distribute owedAmount proportionally
+                            let payerPaid = paidAmounts[payer] || 0;
+                            let payerShare = (payerPaid / totalPaid) * owedAmount;
+                            group.balances[participant][payer] += payerShare;
+                        }
+                    });
+                });
+            });
+
+            // Round off balances to 2 decimal points
+            group.members.forEach(member => {
+                Object.keys(group.balances[member]).forEach(other => {
+                    group.balances[member][other] = parseFloat(group.balances[member][other].toFixed(2));
+                });
+            });
+        }
+
+        function goBack() {
+            currentGroupId = null;
+            document.getElementById('mainContainer').innerHTML = `
+                <!-- Header -->
+                <div class="header">
+                    <div class="logo">
+                        💰 SplitWise
+                    </div>
+                    <div class="header-icons">
+                        <button class="icon-btn" onclick="searchGroups()">
+                            🔍
+                        </button>
+                        <button class="icon-btn" onclick="showCreateGroupModal()">
+                            👥➕
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Overall Balance -->
+                <div class="overall-balance">
+                    <div class="balance-text">Overall, you</div>
+                    <div class="balance-amount" id="overallBalance">
+                        <span class="amount-get">get ₹0</span>
+                    </div>
+                </div>
+
+                <!-- Groups Container -->
+                <div class="groups-container" id="groupsContainer">
+                </div>
+
+                <!-- Create Group Button -->
+                <button class="create-group-btn" onclick="showCreateGroupModal()">
+                    ➕
+                </button>
+            `;
+            loadGroups();
+        }
+
+        function shareGroup(groupId) {
+            const shareUrl = `${window.location.origin}${window.location.pathname}#view/${groupId}`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Join my expense group',
+                    url: shareUrl
+                });
+            } else {
+                navigator.clipboard.writeText(shareUrl).then(() => {
+                    alert('Group link copied to clipboard!');
+                });
+            }
+        }
+
+        function shareLink(groupId) {
+            shareGroup(groupId);
+        }
+
+        function searchGroups() {
+            const searchTerm = prompt('Search groups:');
+            if (searchTerm) {
+                const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+                const filteredGroups = groups.filter(group => 
+                    group.name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+                console.log('Search results:', filteredGroups);
+            }
+        }
+
+        function deleteExpense(groupId, expenseId) {
+            let groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const groupIndex = groups.findIndex(g => g.id === groupId);
+            if (groupIndex === -1) return;
+
+            // Remove the expense
+            groups[groupIndex].expenses = groups[groupIndex].expenses.filter(exp => exp.id !== expenseId);
+
+            // Recalculate balances
+            updateGroupBalances(groups[groupIndex]);
+
+            // Save to localStorage
+            localStorage.setItem('splitwise_groups', JSON.stringify(groups));
+
+            // Refresh group page
+            createGroupPage(groupId);
+        }
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', function(e) {
+            const modals = ['createGroupModal', 'addMembersModal', 'addExpenseModal', 'paidByModal', 'splitModal', 'splitDetailsModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
