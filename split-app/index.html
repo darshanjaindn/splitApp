@@ -1303,38 +1303,33 @@
         }
 
         function saveMembersToGroup() {
-            const memberInputs = document.querySelectorAll('.member-input');
-            const newMembers = [];
-            
-            memberInputs.forEach(input => {
-                const memberName = input.value.trim();
-                if (memberName && !newMembers.includes(memberName)) {
-                    newMembers.push(memberName);
-                }
-            });
-
-            if (newMembers.length === 0) {
-                alert('Please enter at least one member name');
-                return;
-            }
-
-            // Update group with new members
-            const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
-            const groupIndex = groups.findIndex(g => g.id === currentGroupId);
-            
+            // ...existing code...
             if (groupIndex !== -1) {
+                // Add new members
                 newMembers.forEach(member => {
                     if (!groups[groupIndex].members.includes(member)) {
                         groups[groupIndex].members.push(member);
+                        // Initialize balance structure for new member
+                        if (!groups[groupIndex].balances) {
+                            groups[groupIndex].balances = {};
+                        }
+                        groups[groupIndex].balances[member] = {
+                            gets: {},
+                            owes: {},
+                            getsTotal: 0,
+                            owesTotal: 0
+                        };
                     }
                 });
                 
                 localStorage.setItem('splitwise_groups', JSON.stringify(groups));
                 hideAddMembersModal();
+                // Recalculate balances before refreshing view
+                updateGroupBalances(groups[groupIndex]);
                 createGroupPage(currentGroupId);
             }
         }
-
+        
         function showEditParticipantsModal() {
             const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
             const group = groups.find(g => g.id === currentGroupId);
@@ -1553,7 +1548,6 @@
                 return;
             }
             
-            // Get current group
             const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
             const groupIndex = groups.findIndex(g => g.id === currentGroupId);
             
@@ -1569,23 +1563,29 @@
                 id: 'expense_' + Date.now(),
                 description: description,
                 amount: amount,
-                paidBy: currentExpense.paidBy.length === 1 ? currentExpense.paidBy[0] : 'Multiple people',
+                paidBy: currentExpense.paidBy[0], // We'll use the first payer for now
                 paidByDetails: currentExpense.paidBy,
-                paidByAmounts: currentExpense.paidByAmounts,
                 splitType: currentExpense.splitType || 'equally',
                 participants: currentExpense.participants || group.members,
-                splitDetails: currentExpense.splitDetails || {},
+                splitDetails: {},
                 createdAt: new Date().toISOString()
             };
             
-            // Calculate split amounts if equally
+            // Calculate split amounts
+            const participants = expense.participants.length > 0 ? expense.participants : group.members;
+            const perPersonShare = parseFloat((amount / participants.length).toFixed(2));
+            
             if (expense.splitType === 'equally') {
-                const participantCount = expense.participants.length > 0 ? expense.participants.length : group.members.length;
-                const amountPerPerson = amount / participantCount;
-                expense.splitDetails = {};
-                (expense.participants.length > 0 ? expense.participants : group.members).forEach(member => {
-                    expense.splitDetails[member] = amountPerPerson;
+                participants.forEach(member => {
+                    expense.splitDetails[member] = perPersonShare;
                 });
+            } else {
+                // Use the existing split details or default to equal split
+                expense.splitDetails = currentExpense.splitDetails || 
+                    participants.reduce((acc, member) => {
+                        acc[member] = perPersonShare;
+                        return acc;
+                    }, {});
             }
             
             // Add expense to group
@@ -1607,86 +1607,125 @@
             group.balances = {};
             group.members.forEach(member => {
                 group.balances[member] = {
-                    gets: {},    // Who owes this member money
-                    owes: {},    // Who this member owes money to
+                    gets: {},
+                    owes: {},
                     getsTotal: 0,
                     owesTotal: 0
                 };
             });
 
-            // For each expense, calculate balances
+            // Calculate balances for each expense
             group.expenses.forEach(expense => {
-                const paidBy = expense.paidByDetails?.[0] || expense.paidBy;
-                const amount = expense.amount;
-                const participants = expense.participants || group.members;
-                const perPersonShare = parseFloat((amount / participants.length).toFixed(2));
-
-                // Calculate payer's share and what others owe
-                const payerGetsBack = amount - perPersonShare; // Total minus their own share
+                const paidBy = expense.paidBy;
+                const amount = parseFloat(expense.amount);
+                const splitDetails = expense.splitDetails || {};
+                const participants = Object.keys(splitDetails).length > 0 ? Object.keys(splitDetails) : group.members;
+                
+                // Calculate per person share
+                const totalParticipants = participants.length;
+                const perPersonShare = parseFloat((amount / totalParticipants).toFixed(2));
 
                 participants.forEach(participant => {
                     if (participant !== paidBy) {
-                        // Update what others owe to payer
+                        // Calculate exact share or use equal share
+                        const shareAmount = splitDetails[participant] || perPersonShare;
+
+                        // Update what participant owes to payer
                         if (!group.balances[participant].owes[paidBy]) {
                             group.balances[participant].owes[paidBy] = 0;
                         }
-                        group.balances[participant].owes[paidBy] += perPersonShare;
-                        group.balances[participant].owesTotal += perPersonShare;
+                        group.balances[participant].owes[paidBy] += shareAmount;
+                        group.balances[participant].owesTotal += shareAmount;
 
-                        // Update what payer gets from others
+                        // Update what payer gets from participant
                         if (!group.balances[paidBy].gets[participant]) {
                             group.balances[paidBy].gets[participant] = 0;
                         }
-                        group.balances[paidBy].gets[participant] += perPersonShare;
-                        group.balances[paidBy].getsTotal += perPersonShare;
+                        group.balances[paidBy].gets[participant] += shareAmount;
+                        group.balances[paidBy].getsTotal += shareAmount;
                     }
                 });
             });
 
             // Round all balances to 2 decimal points
             group.members.forEach(member => {
-                group.balances[member].getsTotal = parseFloat(group.balances[member].getsTotal.toFixed(2));
-                group.balances[member].owesTotal = parseFloat(group.balances[member].owesTotal.toFixed(2));
-                
+                // Round gets
                 Object.keys(group.balances[member].gets).forEach(person => {
-                    group.balances[member].gets[person] = parseFloat(group.balances[member].gets[person].toFixed(2));
+                    group.balances[member].gets[person] = parseFloat(
+                        group.balances[member].gets[person].toFixed(2)
+                    );
                 });
-                
+
+                // Round owes
                 Object.keys(group.balances[member].owes).forEach(person => {
-                    group.balances[member].owes[person] = parseFloat(group.balances[member].owes[person].toFixed(2));
+                    group.balances[member].owes[person] = parseFloat(
+                        group.balances[member].owes[person].toFixed(2)
+                    );
                 });
+
+                // Round totals
+                group.balances[member].getsTotal = parseFloat(
+                    Object.values(group.balances[member].gets)
+                        .reduce((sum, amount) => sum + amount, 0)
+                        .toFixed(2)
+                );
+
+                group.balances[member].owesTotal = parseFloat(
+                    Object.values(group.balances[member].owes)
+                        .reduce((sum, amount) => sum + amount, 0)
+                        .toFixed(2)
+                );
             });
         }
-
+        
         function renderBalances(group) {
             if (!group.balances) return '<div style="text-align:center;color:#666;">No balances yet</div>';
+            
             let balancesHTML = '';
-
+            
             group.members.forEach(member => {
+                // Ensure member has balance structure
+                if (!group.balances[member]) {
+                    group.balances[member] = {
+                        gets: {},
+                        owes: {},
+                        getsTotal: 0,
+                        owesTotal: 0
+                    };
+                }
+
                 const memberBalance = group.balances[member];
                 const hasTransactions = memberBalance.getsTotal > 0 || memberBalance.owesTotal > 0;
 
                 if (hasTransactions) {
                     balancesHTML += `
                         <div class="expense-item">
-                            <div style="font-weight:600;margin-bottom:12px;">${member}</div>
+                            <div style="font-weight:600;margin-bottom:12px;">
+                                ${member}
+                            </div>
+                            
                             ${memberBalance.getsTotal > 0 ? `
                                 <div style="color:#38a169;margin-bottom:8px;">
                                     <div style="font-weight:500;">Gets back: ₹${memberBalance.getsTotal}</div>
                                     <div style="font-size:14px;margin-top:4px;">
-                                        ${Object.entries(memberBalance.gets).map(([person, amount]) => 
-                                            `• ${person} owes ₹${amount}`
-                                        ).join('<br>')}
+                                        ${Object.entries(memberBalance.gets)
+                                            .map(([person, amount]) => 
+                                                `• ${person} owes ₹${amount.toFixed(2)}`
+                                            )
+                                            .join('<br>')}
                                     </div>
                                 </div>
                             ` : ''}
+                            
                             ${memberBalance.owesTotal > 0 ? `
                                 <div style="color:#e53e3e;margin-top:4px;">
                                     <div style="font-weight:500;">Owes: ₹${memberBalance.owesTotal}</div>
                                     <div style="font-size:14px;margin-top:4px;">
-                                        ${Object.entries(memberBalance.owes).map(([person, amount]) => 
-                                            `• Owes ₹${amount} to ${person}`
-                                        ).join('<br>')}
+                                        ${Object.entries(memberBalance.owes)
+                                            .map(([person, amount]) => 
+                                                `• Owes ₹${amount.toFixed(2)} to ${person}`
+                                            )
+                                            .join('<br>')}
                                     </div>
                                 </div>
                             ` : ''}
@@ -1698,9 +1737,10 @@
             if (!balancesHTML) {
                 balancesHTML = '<div style="text-align:center;color:#666;">All settled up!</div>';
             }
+
             return balancesHTML;
         }
-        
+
         function goBack() {
             currentGroupId = null;
             document.getElementById('mainContainer').innerHTML = `
