@@ -776,6 +776,18 @@
         </div>
     </div>
 
+    <!-- Edit Participants Modal -->
+    <div class="modal" id="editParticipantsModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="hideEditParticipantsModal()">&times;</button>
+            <div class="modal-header">
+                <h2 class="modal-title">Edit Participants</h2>
+            </div>
+            <div id="editParticipantsContainer"></div>
+            <button class="btn btn-primary" onclick="saveEditedParticipants()" style="margin-top: 20px;">Save</button>
+        </div>
+    </div>
+
     <!-- Add Expense Modal -->
     <div class="modal" id="addExpenseModal">
         <div class="modal-content">
@@ -1064,6 +1076,7 @@
                         <button class="icon-btn" onclick="goBack()">←</button>
                         <div class="logo">${group.name}</div>
                         <button class="icon-btn" onclick="shareGroup('${groupId}')">📤</button>
+                        <button class="icon-btn" onclick="deleteGroup('${groupId}')" style="color:#e53e3e;">🗑️</button>
                     </div>
 
                     <!-- Group Icon Section -->
@@ -1128,7 +1141,7 @@
                             <div class="member-list">
                                 ${renderMembersList(group)}
                             </div>
-                            <button class="btn btn-secondary" onclick="showAddMembersModal()" style="margin-top: 20px;">Add More Members</button>
+                            <button class="btn btn-secondary" onclick="showEditParticipantsModal()" style="margin-top: 20px;">Edit Participants</button>
                         </div>
 
                         <div id="balancesTab" style="display: none;">
@@ -1165,47 +1178,15 @@
         function renderMembersList(group) {
             return group.members.map(member => {
                 const initial = member.charAt(0).toUpperCase();
-                const balance = calculateUserBalance(group, member);
-                const balanceText = balance === 0 ? 'settled up' : `${balance > 0 ? 'gets' : 'owes'} ₹${Math.abs(balance)}`;
-                const balanceClass = balance > 0 ? 'amount-get' : balance < 0 ? 'amount-owe' : '';
-                
                 return `
                     <div class="member-item">
                         <div class="member-avatar">${initial}</div>
                         <div style="flex: 1;">
                             <div style="font-weight: 600;">${member}</div>
-                            <div style="font-size: 14px; color: #666;" class="${balanceClass}">${balanceText}</div>
                         </div>
                     </div>
                 `;
             }).join('');
-        }
-
-        function renderBalances(group) {
-            if (!group.balances) return '<div style="text-align:center;color:#666;">No balances yet</div>';
-            let balancesHTML = '';
-            const balances = simplifyDebt ? simplifyDebts(group.balances) : group.balances;
-
-            Object.entries(balances).forEach(([debtor, creditors]) => {
-                if (typeof creditors === 'object') {
-                    Object.entries(creditors).forEach(([creditor, amount]) => {
-                        if (amount > 0.009) { // Only show non-zero balances
-                            balancesHTML += `
-                                <div class="expense-item">
-                                    <div class="expense-details">
-                                        <strong>${debtor}</strong> owes <strong>${creditor}</strong> <span class="amount-owe">₹${amount.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                    });
-                }
-            });
-
-            if (!balancesHTML) {
-                balancesHTML = '<div style="text-align:center;color:#666;">All settled up!</div>';
-            }
-            return balancesHTML;
         }
 
         function calculateTotalSpending(group) {
@@ -1350,6 +1331,52 @@
                 
                 localStorage.setItem('splitwise_groups', JSON.stringify(groups));
                 hideAddMembersModal();
+                createGroupPage(currentGroupId);
+            }
+        }
+
+        function showEditParticipantsModal() {
+            const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const group = groups.find(g => g.id === currentGroupId);
+            let html = '';
+            group.members.forEach(member => {
+                html += `
+                    <div class="member-input-group">
+                        <span style="margin-right: 8px;">👤</span>
+                        <input type="text" class="member-input" value="${member}">
+                        <button type="button" class="remove-member-btn" onclick="removeMemberInput(this)">×</button>
+                    </div>
+                `;
+            });
+            document.getElementById('editParticipantsContainer').innerHTML = html;
+            document.getElementById('editParticipantsModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideEditParticipantsModal() {
+            document.getElementById('editParticipantsModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function saveEditedParticipants() {
+            const memberInputs = document.querySelectorAll('#editParticipantsContainer .member-input');
+            const newMembers = [];
+            memberInputs.forEach(input => {
+                const memberName = input.value.trim();
+                if (memberName && !newMembers.includes(memberName)) {
+                    newMembers.push(memberName);
+                }
+            });
+            if (newMembers.length === 0) {
+                alert('Please enter at least one member name');
+                return;
+            }
+            let groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const groupIndex = groups.findIndex(g => g.id === currentGroupId);
+            if (groupIndex !== -1) {
+                groups[groupIndex].members = newMembers;
+                localStorage.setItem('splitwise_groups', JSON.stringify(groups));
+                hideEditParticipantsModal();
                 createGroupPage(currentGroupId);
             }
         }
@@ -1576,56 +1603,104 @@
         }
 
         function updateGroupBalances(group) {
-            // Reset balances: balances[debtor][creditor] = amount
+            // Reset balances
             group.balances = {};
             group.members.forEach(member => {
-                group.balances[member] = {};
-                group.members.forEach(other => {
-                    if (member !== other) {
-                        group.balances[member][other] = 0;
+                group.balances[member] = {
+                    gets: {},    // Who owes this member money
+                    owes: {},    // Who this member owes money to
+                    getsTotal: 0,
+                    owesTotal: 0
+                };
+            });
+
+            // For each expense, calculate balances
+            group.expenses.forEach(expense => {
+                const paidBy = expense.paidByDetails?.[0] || expense.paidBy;
+                const amount = expense.amount;
+                const participants = expense.participants || group.members;
+                const perPersonShare = parseFloat((amount / participants.length).toFixed(2));
+
+                // Calculate payer's share and what others owe
+                const payerGetsBack = amount - perPersonShare; // Total minus their own share
+
+                participants.forEach(participant => {
+                    if (participant !== paidBy) {
+                        // Update what others owe to payer
+                        if (!group.balances[participant].owes[paidBy]) {
+                            group.balances[participant].owes[paidBy] = 0;
+                        }
+                        group.balances[participant].owes[paidBy] += perPersonShare;
+                        group.balances[participant].owesTotal += perPersonShare;
+
+                        // Update what payer gets from others
+                        if (!group.balances[paidBy].gets[participant]) {
+                            group.balances[paidBy].gets[participant] = 0;
+                        }
+                        group.balances[paidBy].gets[participant] += perPersonShare;
+                        group.balances[paidBy].getsTotal += perPersonShare;
                     }
                 });
             });
 
-            // For each expense, update balances
-            group.expenses.forEach(expense => {
-                const paidByDetails = expense.paidByDetails || [expense.paidBy];
-                const splitDetails = expense.splitDetails || {};
-                let paidAmounts = {};
-                let totalPaid = 0;
-
-                // Calculate paid amounts
-                if (expense.paidByAmounts && paidByDetails.length > 1) {
-                    paidByDetails.forEach(payer => {
-                        paidAmounts[payer] = expense.paidByAmounts[payer] || 0;
-                        totalPaid += paidAmounts[payer];
-                    });
-                } else {
-                    paidAmounts[paidByDetails[0]] = expense.amount;
-                    totalPaid = expense.amount;
-                }
-
-                // For each participant, calculate how much they owe to each payer
-                Object.entries(splitDetails).forEach(([participant, owedAmount]) => {
-                    paidByDetails.forEach(payer => {
-                        if (participant !== payer) {
-                            // If multiple payers, distribute owedAmount proportionally
-                            let payerPaid = paidAmounts[payer] || 0;
-                            let payerShare = (payerPaid / totalPaid) * owedAmount;
-                            group.balances[participant][payer] += payerShare;
-                        }
-                    });
-                });
-            });
-
-            // Round off balances to 2 decimal points
+            // Round all balances to 2 decimal points
             group.members.forEach(member => {
-                Object.keys(group.balances[member]).forEach(other => {
-                    group.balances[member][other] = parseFloat(group.balances[member][other].toFixed(2));
+                group.balances[member].getsTotal = parseFloat(group.balances[member].getsTotal.toFixed(2));
+                group.balances[member].owesTotal = parseFloat(group.balances[member].owesTotal.toFixed(2));
+                
+                Object.keys(group.balances[member].gets).forEach(person => {
+                    group.balances[member].gets[person] = parseFloat(group.balances[member].gets[person].toFixed(2));
+                });
+                
+                Object.keys(group.balances[member].owes).forEach(person => {
+                    group.balances[member].owes[person] = parseFloat(group.balances[member].owes[person].toFixed(2));
                 });
             });
         }
 
+        function renderBalances(group) {
+            if (!group.balances) return '<div style="text-align:center;color:#666;">No balances yet</div>';
+            let balancesHTML = '';
+
+            group.members.forEach(member => {
+                const memberBalance = group.balances[member];
+                const hasTransactions = memberBalance.getsTotal > 0 || memberBalance.owesTotal > 0;
+
+                if (hasTransactions) {
+                    balancesHTML += `
+                        <div class="expense-item">
+                            <div style="font-weight:600;margin-bottom:12px;">${member}</div>
+                            ${memberBalance.getsTotal > 0 ? `
+                                <div style="color:#38a169;margin-bottom:8px;">
+                                    <div style="font-weight:500;">Gets back: ₹${memberBalance.getsTotal}</div>
+                                    <div style="font-size:14px;margin-top:4px;">
+                                        ${Object.entries(memberBalance.gets).map(([person, amount]) => 
+                                            `• ${person} owes ₹${amount}`
+                                        ).join('<br>')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${memberBalance.owesTotal > 0 ? `
+                                <div style="color:#e53e3e;margin-top:4px;">
+                                    <div style="font-weight:500;">Owes: ₹${memberBalance.owesTotal}</div>
+                                    <div style="font-size:14px;margin-top:4px;">
+                                        ${Object.entries(memberBalance.owes).map(([person, amount]) => 
+                                            `• Owes ₹${amount} to ${person}`
+                                        ).join('<br>')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+            });
+
+            if (!balancesHTML) {
+                balancesHTML = '<div style="text-align:center;color:#666;">All settled up!</div>';
+            }
+            return balancesHTML;
+        }
+        
         function goBack() {
             currentGroupId = null;
             document.getElementById('mainContainer').innerHTML = `
@@ -1710,6 +1785,13 @@
 
             // Refresh group page
             createGroupPage(groupId);
+        }
+        
+        function deleteGroup(groupId) {
+            let groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            groups = groups.filter(g => g.id !== groupId);
+            localStorage.setItem('splitwise_groups', JSON.stringify(groups));
+            goBack();
         }
         
         // Close modals when clicking outside
