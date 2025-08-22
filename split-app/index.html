@@ -1303,12 +1303,32 @@
         }
 
         function saveMembersToGroup() {
-            // ...existing code...
+            const memberInputs = document.querySelectorAll('#membersInputContainer .member-input');
+            const newMembers = [];
+            
+            // Collect new member names
+            memberInputs.forEach(input => {
+                const memberName = input.value.trim();
+                if (memberName && !newMembers.includes(memberName)) {
+                    newMembers.push(memberName);
+                }
+            });
+
+            if (newMembers.length === 0) {
+                alert('Please enter at least one member name');
+                return;
+            }
+
+            // Get groups and find current group
+            let groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
+            const groupIndex = groups.findIndex(g => g.id === currentGroupId);
+
             if (groupIndex !== -1) {
                 // Add new members
                 newMembers.forEach(member => {
                     if (!groups[groupIndex].members.includes(member)) {
                         groups[groupIndex].members.push(member);
+                        
                         // Initialize balance structure for new member
                         if (!groups[groupIndex].balances) {
                             groups[groupIndex].balances = {};
@@ -1321,15 +1341,17 @@
                         };
                     }
                 });
-                
+
+                // Save updated groups to localStorage
                 localStorage.setItem('splitwise_groups', JSON.stringify(groups));
+                
+                // Hide modal and refresh view
                 hideAddMembersModal();
-                // Recalculate balances before refreshing view
                 updateGroupBalances(groups[groupIndex]);
                 createGroupPage(currentGroupId);
             }
         }
-        
+
         function showEditParticipantsModal() {
             const groups = JSON.parse(localStorage.getItem('splitwise_groups') || '[]');
             const group = groups.find(g => g.id === currentGroupId);
